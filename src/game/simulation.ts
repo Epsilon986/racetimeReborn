@@ -1,7 +1,9 @@
 import { Track, clamp } from './track.ts';
 
 export const STEP = 1 / 120;
-export const SIM_VERSION = 1;
+export const SIM_VERSION = 2;
+export const MAX_SPEED = 920;
+export const CAR_HALF_WIDTH = 17;
 export type InputEvent = { tick: number; held: boolean };
 export type Replay = { version: number; trackId: string; ticks: number; events: InputEvent[]; createdAt: string };
 export type RaceState = { tick: number; progress: number; lane: number; lateralSpeed: number; speed: number; finished: boolean; wallCooldown: number; contacts: number; contactFlash: number };
@@ -15,19 +17,21 @@ export function stepRace(track: Track, state: RaceState, held: boolean): void {
   state.tick++;
   state.wallCooldown = Math.max(0, state.wallCooldown - STEP);
   state.contactFlash = Math.max(0, state.contactFlash - STEP);
-  const targetSpeed = held ? 640 : 185;
-  state.speed += clamp(targetSpeed - state.speed, -(held ? 100 : 500) * STEP, (held ? 270 : 80) * STEP);
+  state.speed = clamp(state.speed + (held ? 820 : -440) * STEP, 0, MAX_SPEED);
   const corner = track.corner(state.progress);
   const force = corner.curvature * state.speed * state.speed / Math.max(30, corner.width) * corner.orientation;
-  state.lateralSpeed += force * (held ? -0.05 : 0.12) * STEP;
-  state.lateralSpeed *= Math.exp(-3.8 * STEP);
+  // Release changes the line immediately, without first fighting a long inertial slide.
+  // Retaining forward momentum makes quick taps useful instead of expensive braking.
+  const lateralTarget = clamp(force * (held ? -0.065 : 0.3), -6, 6);
+  state.lateralSpeed += (lateralTarget - state.lateralSpeed) * (1 - Math.exp(-24 * STEP));
   state.lane += state.lateralSpeed * STEP;
-  if (state.lane < 0 || state.lane > 2) {
-    state.lane = clamp(state.lane, 0, 2);
-    state.lateralSpeed *= -0.12;
+  const limits = track.laneLimits(state.progress, CAR_HALF_WIDTH);
+  if (state.lane < limits.min || state.lane > limits.max) {
+    state.lane = clamp(state.lane, limits.min, limits.max);
+    state.lateralSpeed = 0;
     if (!state.wallCooldown) {
-      state.speed *= held ? 0.5 : 0.8;
-      state.wallCooldown = 0.38;
+      state.speed *= held ? 0.78 : 0.9;
+      state.wallCooldown = 0.5;
       state.contactFlash = 0.25;
       state.contacts++;
     }
@@ -43,6 +47,9 @@ export function stepRace(track: Track, state: RaceState, held: boolean): void {
     distance -= remaining;
     if (state.progress >= track.count * 2) { state.progress = track.count * 2; state.finished = true; }
   }
+  // A new segment may be narrower: keep the car's body inside the same visible walls.
+  const nextLimits = track.laneLimits(state.progress, CAR_HALF_WIDTH);
+  state.lane = clamp(state.lane, nextLimits.min, nextLimits.max);
 }
 
 export class Ghost {

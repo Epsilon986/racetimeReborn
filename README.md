@@ -24,24 +24,30 @@ npm run preview
 
 ## Play
 
-- Hold **Space**, the accelerator, or the track to accelerate. Release to slow down and tighten the line.
+- Hold **Space**, **W**, **Up**, the accelerator, or the track to accelerate. Briefly release to change the line while keeping momentum.
 - Finish **two laps**. Your best input recording becomes your opponent on the next attempt.
 - Press **R** or Restart to retry immediately.
 - Press **P** or the pause button to pause/resume. Changing tabs or losing focus also pauses and releases input.
-- Toggle your personal-best ghost in the sidebar. On narrow screens, the ghost is shown automatically when a best run exists.
+- Open the **three-dot menu** to toggle your personal-best ghost, sound, or fullscreen. These controls are available on phone and desktop layouts.
 - Sound is opt-in. Best runs are saved in browser local storage; if storage is unavailable, they remain available for the current session.
 
 ## What is implemented
 
-One recovered Farm River Sprint layout, three lanes, automatic path following, acceleration/release input, lane drift, wall speed penalties, countdown, two-lap timing, instant retries, pause/resume, personal-best ghosts, and a session run list. The circuit artwork, cars, scenery, and interface are drawn for this prototype.
+One recovered Farm River Sprint layout, three lanes, automatic path following, acceleration/release input, lane drift, wall speed penalties, countdown, two-lap timing, instant retries, pause/resume, and personal-best ghosts. A close camera follows the player with a small look-ahead into corners. The circuit artwork, cars, scenery, and interface are drawn for this prototype.
+
+The game fills the viewport. The race HUD contains the clock, lap count, restart/pause/menu controls, and accelerator. The previous sidebar, pace meter, session run list, tips, branding bars, and footer have been removed.
+
+All three road lanes are constructed from the recovered paths, with solid dividers and walls at the outer half-lane edges. Collision limits use those same wall positions and the car's width; there is no extra asphalt shoulder between the outer lanes and the walls.
+
+Handling version 2 raises the maximum speed from 640 to 920 world units/second, accelerates faster, responds more quickly to releases, and reduces wall penalties. Previous version-1 recordings stay in storage but are excluded from racing because their simulation is incompatible. Short retries use a shorter countdown.
 
 The handling is **reconstructed prototype tuning**, not a line-for-line port of the APK. Daily rotation, accounts, online leaderboards, currency, racer collections, and native app packaging are not implemented. There are no simulated online competitors or server rankings.
 
 ## Rendering and dependencies
 
-Vite and TypeScript are installed through npm and locked in `package-lock.json`. The renderer requests **Phaser 3.90.0** from jsDelivr at runtime. When available, Phaser presents a CanvasTexture containing the race scene. A complete Canvas 2D renderer is active immediately and remains playable if Phaser cannot load. Google Fonts are optional; system fonts are provided as fallbacks.
+Vite and TypeScript are installed through npm and locked in `package-lock.json`. The renderer requests **Phaser 3.90.0** from jsDelivr at runtime. When available, Phaser presents a CanvasTexture containing the race scene. A complete Canvas 2D renderer is active immediately and remains playable if Phaser cannot load. The interface uses system fonts and makes no font downloads.
 
-This arrangement allowed development under the current network restriction, where Phaser was not cached and package downloads were blocked. Before a mobile or fully offline release, install/bundle Phaser locally, self-host any chosen fonts, and test the Phaser adapter on target devices. Do not describe this prototype as an offline-packaged Phaser application.
+This arrangement allowed development under the current network restriction, where Phaser was not cached and package downloads were blocked. Before a mobile or fully offline release, install/bundle Phaser locally and test the Phaser adapter on target devices. Do not describe this prototype as an offline-packaged Phaser application.
 
 ## Structure
 
@@ -51,6 +57,7 @@ src/game/track.ts           Recovered path sampling and geometry
 src/game/simulation.ts      Fixed 120 Hz simulation and ghost playback
 src/game/storage.ts         Versioned local replay validation/persistence
 src/game/renderer.ts        Canvas drawing and Phaser presentation adapter
+src/game/camera.ts          Smooth player follow, look-ahead, and zoom
 src/data/farm-river.json    Converted APK lane geometry
 src/style.css               Responsive game interface
 tests/                      Simulation and persistence checks
@@ -75,9 +82,13 @@ See `../analysis/APK_FINDINGS.md` for the static-analysis evidence and remaining
 
 ## Verification
 
-Automated checks cover track geometry, per-tick ghost equivalence, acceleration/release behavior, wall penalties, input-strategy differences, clock formatting, and malformed replay rejection. Production compilation and asset bundling are checked with `npm run build`.
+All 13 automated checks pass. They cover track geometry, matching road/collision boundaries, per-tick ghost equivalence, quick-release response and speed retention, acceleration/stopping, wall penalties, input-strategy differences, clock formatting, malformed replay rejection, and camera visibility over a complete race at phone, landscape-phone, and desktop viewport sizes. Production compilation and asset bundling pass with `npm run build`.
 
-Browser screenshot testing was attempted on this host, but Chrome's child processes could not initialize successfully under the execution restrictions. Visual appearance, real pointer/keyboard interactions, the external Phaser runtime, and mobile behavior still need interactive verification. No Android/iOS device has been tested.
+A deterministic corner-aware input probe completes the two-lap course in 17.54 seconds with no wall contacts, versus 18.86 seconds and 26 contacts when holding full throttle. These are simulation checks, not human play-test results or a comparison with original-game times.
+
+Browser screenshot testing was attempted on this host with Chrome and Edge, but their GPU/renderer child processes could not initialize under the execution restrictions. The existing local Vite preview returns HTTP 200. Visual appearance, real pointer/keyboard interactions, the external Phaser runtime, and mobile behavior still need interactive verification. No Android/iOS device has been tested.
+
+The owner supplied [this original gameplay video](https://www.youtube.com/watch?v=3t981LXQzjc) for this revision. Automated access could find its indexed description but could not inspect playback; no frame-by-frame match is claimed.
 
 ## Next implementation priorities
 
