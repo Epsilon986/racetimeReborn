@@ -1,14 +1,20 @@
 import { Track, clamp } from './track.ts';
 
 export const STEP = 1 / 120;
-export const SIM_VERSION = 2;
+export const SIM_VERSION = 9;
 export const MAX_SPEED = 920;
 export const CAR_HALF_WIDTH = 17;
+const MAX_LATERAL_SPEED = 3;
+const MAX_RELEASE_DRIFT = 1.8;
+const LATERAL_RESPONSE = 1 - Math.exp(-12 * STEP);
+const LANE_CENTERING = 2;
+const LOW_DRIFT_CENTERING = 4;
+const LANE_SWITCH_DISTANCE = 0.58;
 export type InputEvent = { tick: number; held: boolean };
 export type Replay = { version: number; trackId: string; ticks: number; events: InputEvent[]; createdAt: string };
-export type RaceState = { tick: number; progress: number; lane: number; lateralSpeed: number; speed: number; finished: boolean; wallCooldown: number; contacts: number; contactFlash: number };
+export type RaceState = { tick: number; progress: number; lane: number; laneCenter: number; lateralSpeed: number; speed: number; finished: boolean; wallCooldown: number; contacts: number; contactFlash: number };
 export function initialState(): RaceState {
-  return { tick: 0, progress: 0, lane: 1, lateralSpeed: 0, speed: 0, finished: false, wallCooldown: 0, contacts: 0, contactFlash: 0 };
+  return { tick: 0, progress: 0, lane: 1, laneCenter: 1, lateralSpeed: 0, speed: 0, finished: false, wallCooldown: 0, contacts: 0, contactFlash: 0 };
 }
 
 /** Rendering-independent prototype tuning; not an exact port of the original APK. */
@@ -20,17 +26,21 @@ export function stepRace(track: Track, state: RaceState, held: boolean): void {
   state.speed = clamp(state.speed + (held ? 820 : -440) * STEP, 0, MAX_SPEED);
   const corner = track.corner(state.progress);
   const force = corner.curvature * state.speed * state.speed / Math.max(30, corner.width) * corner.orientation;
-  // Release changes the line immediately, without first fighting a long inertial slide.
-  // Retaining forward momentum makes quick taps useful instead of expensive braking.
-  const lateralTarget = clamp(force * (held ? -0.065 : 0.3), -6, 6);
-  state.lateralSpeed += (lateralTarget - state.lateralSpeed) * (1 - Math.exp(-24 * STEP));
+  // A brief lift adjusts the line, while crossing a lane takes sustained lateral movement.
+  const driftLimit = held ? MAX_LATERAL_SPEED : MAX_RELEASE_DRIFT;
+  const drift = clamp(force * (held ? -0.065 : 0.12), -driftLimit, driftLimit);
+  // Ease in a stronger pull toward the center as cornering drift falls away.
+  const lowDrift = 1 - Math.abs(drift) / driftLimit;
+  const centering = LANE_CENTERING + LOW_DRIFT_CENTERING * lowDrift * lowDrift;
+  const lateralTarget = clamp(drift + (state.laneCenter - state.lane) * centering, -MAX_LATERAL_SPEED, MAX_LATERAL_SPEED);
+  state.lateralSpeed += (lateralTarget - state.lateralSpeed) * LATERAL_RESPONSE;
   state.lane += state.lateralSpeed * STEP;
   const limits = track.laneLimits(state.progress, CAR_HALF_WIDTH);
   if (state.lane < limits.min || state.lane > limits.max) {
     state.lane = clamp(state.lane, limits.min, limits.max);
     state.lateralSpeed = 0;
     if (!state.wallCooldown) {
-      state.speed *= held ? 0.78 : 0.9;
+      state.speed *= held ? 0.30 : 0.40;
       state.wallCooldown = 0.5;
       state.contactFlash = 0.25;
       state.contacts++;
@@ -50,6 +60,11 @@ export function stepRace(track: Track, state: RaceState, held: boolean): void {
   // A new segment may be narrower: keep the car's body inside the same visible walls.
   const nextLimits = track.laneLimits(state.progress, CAR_HALF_WIDTH);
   state.lane = clamp(state.lane, nextLimits.min, nextLimits.max);
+  // Keep the current center until the car clears the divider by a small margin.
+  const offset = state.lane - state.laneCenter;
+  if (Math.abs(offset) > LANE_SWITCH_DISTANCE) {
+    state.laneCenter = clamp(state.laneCenter + Math.sign(offset), 0, 2);
+  }
 }
 
 export class Ghost {

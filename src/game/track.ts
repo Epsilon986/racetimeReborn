@@ -1,7 +1,7 @@
 export type Point = { x: number; y: number };
 export type TrackData = { id: string; name: string; lanes: number[][][] };
-// Lane coordinates refer to lane centers. The walls border the outer half-lanes.
-export const TRACK_EDGES = [-0.5, 2.5] as const;
+// Lane centers are 0, 1 and 2. Each wall sits a quarter lane width beyond the outer half-lane.
+export const TRACK_EDGES = [-0.75, 2.75] as const;
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 export const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 export const angleDifference = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));

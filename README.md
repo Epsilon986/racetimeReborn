@@ -37,9 +37,23 @@ One recovered Farm River Sprint layout, three lanes, automatic path following, a
 
 The game fills the viewport. The race HUD contains the clock, lap count, restart/pause/menu controls, and accelerator. The previous sidebar, pace meter, session run list, tips, branding bars, and footer have been removed.
 
-All three road lanes are constructed from the recovered paths, with solid dividers and walls at the outer half-lane edges. Collision limits use those same wall positions and the car's width; there is no extra asphalt shoulder between the outer lanes and the walls.
+All three road lanes are constructed from the recovered paths, with solid dividers and an asphalt shoulder on each side. Each wall sits a quarter lane width beyond the outer lane edge. Collision limits use those same wall positions and the car's width.
 
 Handling version 2 raises the maximum speed from 640 to 920 world units/second, accelerates faster, responds more quickly to releases, and reduces wall penalties. Previous version-1 recordings stay in storage but are excluded from racing because their simulation is incompatible. Short retries use a shorter countdown.
+
+Handling version 3 halves the maximum lateral speed and slows the buildup of sideways movement. Brief releases still adjust the racing line, while lane changes take longer. Personal-best ghosts start fresh for version 3.
+
+Handling version 4 gently pulls the car toward its current lane center. A lane change commits once the car is 8% of a lane width past the divider. Personal-best ghosts start fresh for version 4.
+
+Handling version 5 gradually strengthens the pull toward the lane center as cornering drift fades. Personal-best ghosts start fresh for version 5.
+
+Simulation version 6 adds the extra wall clearance and starts a fresh set of personal-best ghosts.
+
+Simulation version 7 widens the shoulders further. A wall hit now cuts speed by 48% under throttle or 35% after lifting. Personal-best ghosts start fresh for version 7.
+
+Simulation version 8 increases the speed loss from wall hits to 70% under throttle or 60% after lifting. Personal-best ghosts start fresh for version 8.
+
+Simulation version 9 softens the inward drift when the accelerator is released, so short lifts make smaller corrections. Personal-best ghosts start fresh for version 9.
 
 The handling is **reconstructed prototype tuning**, not a line-for-line port of the APK. Daily rotation, accounts, online leaderboards, currency, racer collections, and native app packaging are not implemented. There are no simulated online competitors or server rankings.
 
@@ -82,9 +96,9 @@ See `../analysis/APK_FINDINGS.md` for the static-analysis evidence and remaining
 
 ## Verification
 
-All 13 automated checks pass. They cover track geometry, matching road/collision boundaries, per-tick ghost equivalence, quick-release response and speed retention, acceleration/stopping, wall penalties, input-strategy differences, clock formatting, malformed replay rejection, and camera visibility over a complete race at phone, landscape-phone, and desktop viewport sizes. Production compilation and asset bundling pass with `npm run build`.
+All 19 automated checks pass. They cover track geometry, matching road/collision boundaries, outer-lane clearance, per-tick ghost equivalence, quick-release response and speed retention, lane centering and changes, acceleration/stopping, wall penalties, input-strategy differences, clock formatting, replay validation, and camera visibility over a complete race at phone, landscape-phone, and desktop viewport sizes. Production compilation and asset bundling pass with `npm run build`.
 
-A deterministic corner-aware input probe completes the two-lap course in 17.54 seconds with no wall contacts, versus 18.86 seconds and 26 contacts when holding full throttle. These are simulation checks, not human play-test results or a comparison with original-game times.
+A deterministic corner-aware input probe completes the two-lap course in 17.65 seconds with no wall contacts, versus 27.90 seconds and 33 contacts when holding full throttle. These times come from the browser simulation.
 
 Browser screenshot testing was attempted on this host with Chrome and Edge, but their GPU/renderer child processes could not initialize under the execution restrictions. The existing local Vite preview returns HTTP 200. Visual appearance, real pointer/keyboard interactions, the external Phaser runtime, and mobile behavior still need interactive verification. No Android/iOS device has been tested.
 

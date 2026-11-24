@@ -43,7 +43,7 @@ const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElem
 const track = new Track(trackData);
 const renderer = new RaceRenderer(el('track-view'), track);
 let state = initialState();
-let best = readBest(track.data.id);
+let best = readBest(track);
 let ghost = best ? new Ghost(best) : null;
 let ghostVisible = true;
 type Phase = 'ready' | 'countdown' | 'racing' | 'paused' | 'finished';

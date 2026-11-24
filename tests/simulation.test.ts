@@ -48,12 +48,14 @@ test('holding accelerates and releasing reduces speed', () => {
 });
 
 test('corner boundaries apply a speed penalty and keep the car on the road', () => {
-  const state = initialState(); state.lane = TRACK_EDGES[1]; state.speed = MAX_SPEED;
-  stepRace(track, state, true);
-  assert.equal(state.contacts, 1);
-  assert.ok(state.speed < MAX_SPEED * .85);
-  const limits = track.laneLimits(state.progress, CAR_HALF_WIDTH);
-  assert.ok(state.lane >= limits.min && state.lane <= limits.max);
+  for (const [held, maxRetainedSpeed] of [[true, .32], [false, .42]] as const) {
+    const state = { ...initialState(), lane: TRACK_EDGES[1], laneCenter: 2, speed: MAX_SPEED };
+    stepRace(track, state, held);
+    assert.equal(state.contacts, 1);
+    assert.ok(state.speed < MAX_SPEED * maxRetainedSpeed);
+    const limits = track.laneLimits(state.progress, CAR_HALF_WIDTH);
+    assert.ok(state.lane >= limits.min && state.lane <= limits.max);
+  }
 });
 
 test('different input strategies produce distinct times and valid lanes', () => {
@@ -76,7 +78,7 @@ test('different input strategies produce distinct times and valid lanes', () => 
   console.log(`Full throttle: ${formatTime(throttle.tick * STEP)}, ${throttle.contacts} contacts. Corner timing: ${formatTime(corners.tick * STEP)}, ${corners.contacts} contacts.`);
 });
 
-test('three complete lane widths end exactly at the wall geometry', () => {
+test('three equal lanes have symmetric shoulders and matching wall geometry', () => {
   for (let progress = 0; progress < track.count; progress += .5) {
     const points = [-.5, .5, 1.5, 2.5].map(lane => track.point(progress, lane));
     const widths = points.slice(1).map((p, i) => Math.hypot(p.x - points[i].x, p.y - points[i].y));
@@ -87,6 +89,22 @@ test('three complete lane widths end exactly at the wall geometry', () => {
       const a = track.point(progress, wall), b = track.point(progress, car);
       assert.ok(Math.abs(Math.hypot(a.x - b.x, a.y - b.y) - CAR_HALF_WIDTH) < .05);
     }
+    for (const [wall, edge, width] of [[TRACK_EDGES[0], points[0], widths[0]], [TRACK_EDGES[1], points[3], widths[2]]] as const) {
+      const p = track.point(progress, wall);
+      assert.ok(Math.abs(Math.hypot(p.x - edge.x, p.y - edge.y) / width - .25) < .01);
+    }
+  }
+});
+
+test('steady acceleration through gentle bends leaves clearance in both outer lanes', () => {
+  for (const [lane, progress] of [[0, 87], [2, 108]]) {
+    const state = { ...initialState(), lane, laneCenter: lane, progress, speed: 750 };
+    for (let tick = 0; tick < 30; tick++) {
+      stepRace(track, state, true);
+      assert.equal(state.laneCenter, lane);
+      assert.equal(state.contacts, 0);
+    }
+    assert.ok(Math.abs(state.lane - lane) > .1, 'the bend should produce outward drift');
   }
 });
 
@@ -102,6 +120,40 @@ test('a quick release reverses the line without dumping forward momentum', () =>
   for (let tick = 0; tick < 10; tick++) stepRace(track, state, false);
   assert.ok(state.speed > 700, 'a brief lift should retain speed');
   assert.ok(state.lateralSpeed * turn > 0, 'release should turn inward promptly');
+});
+
+test('a brief lift adjusts the line without crossing a lane divider', () => {
+  const state = initialState();
+  state.progress = Array.from({ length: track.count }, (_, i) => i)
+    .find(i => Math.abs(track.corner(i).curvature) > .004)!;
+  state.speed = MAX_SPEED;
+  for (let tick = 0; tick < 18; tick++) stepRace(track, state, false);
+  assert.ok(Math.abs(state.lane - 1) > .05, 'a lift should still adjust the line');
+  assert.ok(Math.abs(state.lane - 1) < .2, 'a 150 ms lift should make only a small correction');
+  assert.equal(state.laneCenter, 1);
+});
+
+test('a car near a divider settles back into its current lane', () => {
+  const state = initialState();
+  state.lane = 1.54;
+  for (let tick = 0; tick < 60; tick++) stepRace(track, state, false);
+  assert.ok(Math.abs(state.lane - 1) < .13, 'without cornering drift the car should recenter promptly');
+  for (let tick = 60; tick < 240; tick++) stepRace(track, state, false);
+  assert.equal(state.laneCenter, 1);
+  assert.ok(Math.abs(state.lane - 1) < .03);
+});
+
+test('sustained corner drift commits to the next lane', () => {
+  const state = initialState();
+  while (!state.finished && state.laneCenter === 1) stepRace(track, state, true);
+  assert.notEqual(state.laneCenter, 1);
+  assert.ok(Math.abs(state.lane - state.laneCenter) < .5);
+
+  const center = state.laneCenter;
+  state.speed = 0;
+  for (let tick = 0; tick < 240; tick++) stepRace(track, state, false);
+  assert.equal(state.laneCenter, center);
+  assert.ok(Math.abs(state.lane - center) < .03);
 });
 
 test('acceleration reaches racing speed quickly and releasing can stop the car', () => {

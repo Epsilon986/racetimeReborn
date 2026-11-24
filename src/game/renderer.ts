@@ -36,10 +36,10 @@ export class RaceRenderer {
     host.append(this.canvas);
     const b = track.bounds;
     this.terrainBounds = { x: b.x - 500, y: b.y - 500, width: b.width + 1000, height: b.height + 1000 };
-    this.laneBands = [this.ribbon(-0.5, 0.5), this.ribbon(0.5, 1.5), this.ribbon(1.5, 2.5)];
+    this.laneBands = [this.ribbon(TRACK_EDGES[0], 0.5), this.ribbon(0.5, 1.5), this.ribbon(1.5, TRACK_EDGES[1])];
     this.laneLines = [this.path(0.5), this.path(1.5)];
     this.walls = TRACK_EDGES.map(lane => this.path(lane));
-    this.curbs = [this.path(-0.61), this.path(2.61)];
+    this.curbs = [this.path(TRACK_EDGES[0] - 0.11), this.path(TRACK_EDGES[1] + 0.11)];
     this.drawTerrain();
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(host);
@@ -168,7 +168,7 @@ export class RaceRenderer {
     c.strokeStyle = '#e0e3cc'; c.lineWidth = 3;
     for (const line of this.laneLines) c.stroke(line);
     const p = this.track.point(0), h = this.track.heading(0);
-    const halfRoad = this.track.corner(0).width * 1.5;
+    const halfRoad = this.track.corner(0).width * (TRACK_EDGES[1] - 1);
     c.save(); c.translate(p.x, p.y); c.rotate(h);
     for (let row = 0; row < 2; row++) for (let cell = 0; cell < 12; cell++) { c.fillStyle = (cell + row) % 2 ? '#edf1db' : '#293831'; c.fillRect(row * 12 - 12, cell * halfRoad / 6 - halfRoad, 12, halfRoad / 6); }
     c.restore();
